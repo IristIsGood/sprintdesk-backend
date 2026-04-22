@@ -1,0 +1,249 @@
+问：你怎么实现用户认证？
+
+"我用 Spring Security 加 JWT。用户注册时密码用 BCrypt 加密存进 PostgreSQL，登录时验证密码，通过后生成 JWT token 返回给前端。之后每个请求前端带着这个 token，后端验证有效才放行。整个流程是 stateless 的，不需要服务器存 session。"
+
+问：为什么用 JWT 而不是 session？
+
+"JWT 是 stateless 的，token 本身包含用户信息，服务器不需要存状态。适合 REST API 和未来扩展成微服务的场景。Session 需要服务器存状态，横向扩展时多台服务器要共享 session，复杂度更高。"
+
+问：BCrypt 是什么？
+
+"BCrypt 是一种单向哈希算法，专门用来存密码。它内置 salt，每次加密同一个密码结果都不一样，防止彩虹表攻击。验证时用 passwordEncoder.matches() 比对，不需要解密。"
+
+1. How do you implement User Authentication?
+Answer:
+
+"I use Spring Security combined with JWT. When a user registers, I encrypt the password using BCrypt and store it in PostgreSQL. For login, I verify the credentials; if they match, the backend generates a JWT token and returns it to the frontend. After that, the frontend includes this token in the header of every request. The backend validates the token before allowing access. This whole process is stateless, meaning the server doesn't need to store any session data."
+
+2. Why use JWT instead of Session?
+Answer:
+
+"JWT is stateless. Since the token itself contains the user information, the server doesn't need to keep track of who is logged in. This is perfect for REST APIs and makes it much easier to scale into microservices later. With Sessions, the server has to store state. If you scale horizontally (adding more servers), you have to share sessions between them, which adds a lot of complexity."
+
+3. What is BCrypt?
+Answer:
+
+"BCrypt is a one-way hashing algorithm designed specifically for passwords. It has a built-in salt, which means even if two users have the same password, their hashes will look totally different. This prevents rainbow table attacks. When checking a password, I just use passwordEncoder.matches(). Since it's a one-way hash, you don't actually 'decrypt' it; you just compare the hashes."
+
+"How does the Spring Security Filter Chain work?"
+Answer:
+
+"Every HTTP request goes through a Filter Chain. I implemented a custom filter by extending OncePerRequestFilter. This filter intercepts the request, extracts the JWT token from the Authorization header, and validates it.
+
+Once validated, I store the user details into the SecurityContextHolder. Later in the chain, the AuthorizationFilter checks the SecurityContext. If it finds the authentication info, the request is allowed; otherwise, it returns a 403 Forbidden."
+
+好！这个决定对——理解比操作更重要。
+
+---
+
+## N+1 问题文字总结
+
+**什么是 N+1：**
+
+你有 3 个项目，查项目列表时：
+- 第 1 次 SQL：查所有项目 `SELECT * FROM projects`
+- 第 2 次 SQL：查项目 1 的 owner `SELECT * FROM users WHERE id = 1`
+- 第 3 次 SQL：查项目 2 的 owner `SELECT * FROM users WHERE id = 1`
+- 第 4 次 SQL：查项目 3 的 owner `SELECT * FROM users WHERE id = 1`
+
+3 个项目 = 4 次查询。100 个项目 = 101 次查询。这就是 N+1。
+
+**为什么会发生：**
+
+JPA 默认懒加载（`FetchType.LAZY`），只有真正访问 `project.getOwner()` 的时候才去查数据库。`toResponse()` 里调用了 `project.getOwner().getEmail()`，所以每个项目都触发一次。
+
+**怎么修：**
+
+用 `JOIN FETCH` 一次查询把 owner 一起拿回来：
+
+```java
+@Query("SELECT p FROM Project p JOIN FETCH p.owner WHERE p.owner.id = :ownerId")
+List<Project> findByOwnerIdWithOwner(@Param("ownerId") Long ownerId);
+```
+
+一条 SQL 搞定，不管多少个项目都只查一次。
+
+---
+
+## Phase 2 完成总结
+
+```
+✅ Project 实体 + JPA 关系映射
+✅ Task 实体 + 枚举状态
+✅ Project CRUD API
+✅ Task CRUD API
+✅ 分页查询 Pageable
+✅ @Transactional 读写分离
+✅ N+1 问题理解和修复方法
+```
+
+---
+
+## 现在你能回答的面试题
+
+| 问题 | 关键答案 |
+|------|---------|
+| `@OneToMany` 和 `@ManyToOne` 怎么用 | Project 一对多 Task，用 `mappedBy` 和 `@JoinColumn` |
+| `FetchType.LAZY` 和 `EAGER` 区别 | LAZY 用时才查，EAGER 立刻查。默认用 LAZY，避免性能问题 |
+| 什么是 N+1 问题 | 1 次查列表 + N 次查关联数据，用 JOIN FETCH 修复 |
+| `@Transactional(readOnly=true)` 有什么用 | 读操作不开写事务，性能更好，也防止意外写入 |
+| 分页查询怎么做 | `Pageable` + `PageRequest.of(page, size, sort)` |
+
+---
+
+**明天 Phase 3：Redis 缓存**，内容是：
+- 用 `@Cacheable` 缓存项目详情
+- 用 `@CacheEvict` 更新时清缓存
+- 面试能说出什么时候该用缓存、什么时候不该用
+
+今天做得很好，遇到的报错都解决了，这些坑的经历比顺利跑通更有价值。明天继续！
+
+These are "must-know" topics for any backend interview. Here is how to express these concepts in professional, natural English that matches your technical level.
+
+### 1. The Three Common Cache Issues
+
+**Cache Penetration (缓存穿透)**
+* **Definition:** Querying a key that doesn't exist in the database, causing every request to hit the DB directly.
+* **Solution:** "To solve this, I **cache null values** with a short expiration time. Another advanced way is using a **Bloom Filter** to block invalid requests before they reach the database."
+
+**Cache Breakdown (缓存击穿)**
+* **Definition:** A "hot key" (very popular) expires, and a huge wave of requests hits the DB at the exact same moment.
+* **Solution:** "I usually set hot keys to **never expire**, or I use a **mutex lock**. This ensures only one request hits the DB to update the cache while others wait."
+
+**Cache Avalanche (缓存雪崩)**
+* **Definition:** Many keys expire at the same time, crashing the database under the sudden load.
+* **Solution:** "The best fix is to **add a random offset** to the expiration times. Instead of all keys expiring at 10 minutes, I set them to expire at **10 minutes plus a random 1 to 5 minutes**."
+
+
+
+---
+
+### 2. When to use Cache (and when not to)
+
+**Good for Caching:**
+* **Read-heavy data:** "Data that is read often but rarely changed, like **Project Details** or **User Profiles**."
+* **High computation cost:** "Complex query results that take a long time to calculate."
+* **Eventual consistency:** "When it's okay if the data is a few seconds out of date."
+
+**Bad for Caching:**
+* **Write-heavy data:** "Data that changes constantly, like **Action Logs**."
+* **Strong consistency required:** "Sensitive data like **Bank Balances** or **Real-time Inventory**."
+* **Small datasets:** "If the table is tiny, querying the DB is already fast enough."
+
+---
+
+### 3. "Interview-Ready" Answer (The Demo)
+
+**Question: "How did you use Redis in your project?"**
+
+> "In my project, I used **Redis** to cache project details because that data is **read-heavy**. I used the **`@Cacheable`** annotation so the first request hits the database and stores the result in Redis. Every request after that comes directly from the cache.
+>
+> To keep the data consistent, I used **`@CacheEvict`** to clear the cache whenever a project is updated. I also set a **TTL (Time-To-Live)** of 10 minutes to prevent the cache from staying stale for too long."
+
+### 💡 Pro Keywords to use:
+* **Stale data:** (过期/旧数据) "To prevent showing **stale data**, I use a TTL."
+* **Throughput:** (吞吐量) "Caching significantly improved our system's **throughput**."
+* **Bottleneck:** (瓶颈) "The database was our **bottleneck**, so we added a cache layer."
+* **Trade-off:** (权衡) "Using cache is a **trade-off** between performance and data consistency."
+
+How does this sound? Are there any specific technical terms you want me to explain more simply?
+
+This is a great strategic answer. Highlighting that you used **both** shows that you understand how to choose the "right tool for the job."
+
+Here is the English version, refined to sound like a professional software engineer:
+
+### 1. SQL vs. NoSQL: Choosing the Right Strategy
+
+**The Comparison Table:**
+
+| Feature | PostgreSQL (SQL) | MongoDB (NoSQL) |
+| :--- | :--- | :--- |
+| **Schema** | **Strict/Fixed** | **Flexible/Dynamic** |
+| **Relationships** | Supports complex **JOINs** | Not designed for JOINs |
+| **Transactions** | Full **ACID** support | Atomic only at the **Document level** |
+| **Best For** | Users, Orders, Projects | Logs, Events, Metadata |
+
+
+
+---
+
+### 2. "Interview-Ready" Answer (Architecture Choices)
+
+**Question: "Why did you use both PostgreSQL and MongoDB in your project?"**
+
+> "I used a **polyglot persistence** approach for this project. 
+> 
+> I chose **PostgreSQL** for core business data, like **Users and Projects**, because these entities have a fixed structure and require strong **ACID transactions** to ensure data integrity. 
+> 
+> On the other hand, I used **MongoDB** for **Activity Logs**. Since different types of actions have different fields, a fixed SQL schema would be too rigid. MongoDB’s **document-based structure** is much more natural for storing semi-structured log data that we mostly just append and rarely update."
+
+---
+
+### 3. MongoRepository vs. JpaRepository
+
+**The Comparison:**
+The usage is almost identical because of **Spring Data**, but there are key differences in implementation.
+
+* **JPA Repository:** `public interface ProjectRepo extends JpaRepository<Project, Long> {}`
+* **Mongo Repository:** `public interface LogRepo extends MongoRepository<ActivityLog, String> {}`
+
+**Answer:**
+> "Spring Data provides a very consistent experience across JPA and MongoDB. The main code-level difference is that MongoDB uses a **String-based ObjectId** instead of a Long. 
+> 
+> Architecturally, the biggest shift is that `MongoRepository` doesn't support **JOINs**. If I need related data in MongoDB, I either **embed** the data directly in the document or handle the mapping at the **application level** (in the Service layer)."
+
+---
+
+### 🔑 Key Vocabulary to Sound Like a Senior Dev
+
+* **Polyglot Persistence:** (多语言持久化) Using different databases for different needs. Using this term will immediately impress an interviewer.
+* **Rigid vs. Flexible:** (死板 vs 灵活) "SQL schemas can be too **rigid** for evolving log data."
+* **Data Integrity:** (数据完整性) Why we use SQL for money or users.
+* **Append-only:** (只增不改) Perfect for describing logs. "Our logs are **append-only**, which fits MongoDB's performance strengths."
+* **Application Level:** (应用层) "We handle the relationship at the **application level**."
+
+**Quick Tip:** If they ask about performance, you can mention that MongoDB is generally faster for **high-volume writes** (like logs), while PostgreSQL is better for **complex queries** (like generating reports).
+
+恭喜！前端跑通意味着你的全栈链路正式闭环了。这部分在面试中非常关键，因为它展示了你如何处理**前后端交互（Integration）**。
+
+这是为你准备的“面试直通车”英文表达：
+
+### 1. How do you handle JWT in React?
+**Answer:**
+> "After a successful login, I store the JWT in **localStorage**. I use an **Axios Interceptor** to automatically inject the `Authorization: Bearer <token>` header into every outgoing request. To protect specific routes, I created a **PrivateRoute** component that checks for the token; if it's missing, the user is redirected back to the login page."
+
+### 2. What are the benefits of using TypeScript in your project?
+**Answer:**
+> "I use TypeScript to define **interfaces** for our API data, like `Project` and `Task`. This allows for **compile-time error checking**, so I can catch bugs before the code even runs. It also makes the code more **self-documenting**—any developer can see exactly what fields and types are expected without checking the backend code."
+
+### 3. What is `useEffect`?
+**Answer:**
+> "`useEffect` is a React Hook used for **side effects**, like fetching data from an API or setting up subscriptions. I use the **dependency array** to control when it runs: an empty array `[]` means it only runs once when the component **mounts**, which is similar to `componentDidMount` in class components."
+
+---
+
+### 🚀 进阶词汇 (Power Words)
+* **Compile-time vs. Runtime:** (编译时 vs. 运行时) "TypeScript catches errors at **compile-time**."
+* **Boilerplate:** (模版代码) "Axios interceptors help reduce **boilerplate** code by handling headers in one place."
+* **Mount/Unmount:** (挂载/卸载) 组件生命周期的标准术语。
+* **Scalability:** (可扩展性) "TypeScript improves the **scalability** and maintainability of the frontend."
+
+---
+
+### 💡 追问预警 (The "Pro" Follow-up)
+面试官可能会追问：**"Is localStorage safe for storing JWT?"**
+> **你的回答思路：** "While it's simple to implement, it's vulnerable to **XSS attacks**. In a high-security production app, I would consider using **HttpOnly Cookies** to make it even more secure." 
+> *(展现你不仅会用，还懂安全隐患。)*
+
+
+
+前端这部分的回答重点在于：**流程清晰 (Clear Flow)** 和 **类型安全 (Type Safety)**。你现在的准备已经非常扎实了！
+
+面试时怎么说
+"你有没有部署过项目到云端？"
+
+"有，我把 SprintDesk 部署到 AWS EC2。后端是 Spring Boot，用 Docker 容器化，数据库用 PostgreSQL、Redis、MongoDB 分别跑在独立容器里，通过 Docker network 互相通信。前端是 React，用 nginx 服务静态文件。都在同一台 EC2 上跑，可以直接访问：http://54.254.226.187"
+
+"你遇到过什么部署问题？"
+
+"遇到过三个：第一，Mac 本地是 ARM 架构，EC2 是 x86，直接 build 的镜像在 EC2 跑不起来，要用 docker buildx --platform linux/amd64 指定平台。第二，React SPA 部署到 nginx 需要配置 try_files 把所有路由指向 index.html，不然刷新页面会 404。第三，CORS 配置要把前端域名加进白名单，否则浏览器会拦截请求。"
