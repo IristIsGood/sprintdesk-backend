@@ -3,6 +3,8 @@
 
 SprintDesk is a task management system designed to streamline project tracking and team collaboration. Built with a modern Java stack, it demonstrates enterprise-level architecture, cloud-native deployment, and optimized data strategies.
 
+LiveDemo : http://sprintdesk.ddnsking.com/
+
 ## 🎯 Problem & Solution
 * **Problem:** Legacy project management tools often suffer from rigid schemas for activity logging and performance bottlenecks during heavy data retrieval.
 * **Solution:** Implemented a hybrid database approach using PostgreSQL for structured relational data and MongoDB for flexible activity logs. Integrated Redis caching and optimized JPA queries to ensure sub-second response times.
