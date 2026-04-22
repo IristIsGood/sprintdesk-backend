@@ -33,4 +33,9 @@ public class AuthController {
     public ResponseEntity<String> me() {
         return ResponseEntity.ok("你已通过认证！");
     }
+
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+    return ResponseEntity.ok("SprintDesk is running on AWS with CI/CD!");
+}
 }
