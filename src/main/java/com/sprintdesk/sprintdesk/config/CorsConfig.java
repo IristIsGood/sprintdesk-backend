@@ -19,6 +19,8 @@ public class CorsConfig {
         // EC2 前端
         config.addAllowedOrigin("http://54.254.226.187");
 
+        config.addAllowedOrigin("http://sprintdesk.ddnsking.com"); 
+
         // 允许所有 HTTP 方法
         config.addAllowedMethod("*");
 
