@@ -11,12 +11,23 @@ import com.sprintdesk.sprintdesk.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+
+import org.springframework.beans.factory.annotation.Value;
+import java.util.Collections;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+
 @Service
 public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+
+    @Value("${google.client-id}")
+    private String googleClientId;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
@@ -51,4 +62,41 @@ public class AuthService {
         String token = jwtUtil.generateToken(user.getEmail());
         return new AuthResponse(token, user.getEmail(), user.getFullName());
     }
+
+
+    public AuthResponse googleLogin(String credential) {
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(), GsonFactory.getDefaultInstance())
+                .setAudience(Collections.singletonList(googleClientId))
+                .build();
+
+            GoogleIdToken idToken = verifier.verify(credential);
+            if (idToken == null) {
+                throw new RuntimeException("Invalid or expired Google token");
+            }
+
+            GoogleIdToken.Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            String nameFromPayload = (String) payload.get("name");
+            String fullName = nameFromPayload != null ? nameFromPayload : email;
+
+            User user = userRepository.findByEmail(email).orElseGet(() -> {
+                User newUser = new User();
+                newUser.setEmail(email);
+                newUser.setPassword(passwordEncoder.encode("GOOGLE_AUTH_" + email));
+                newUser.setFullName(fullName);
+                return userRepository.save(newUser);
+            });
+
+            String token = jwtUtil.generateToken(user.getEmail());
+            return new AuthResponse(token, user.getEmail(), user.getFullName());
+
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Google authentication failed: " + e.getMessage());
+        }
+    }
+
 }

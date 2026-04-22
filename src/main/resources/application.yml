@@ -35,3 +35,6 @@ spring:
 jwt:
   secret: sprintdesk-secret-key-for-jwt-do-not-use-in-production
   expiration: 86400000  # 24 hours in milliseconds
+
+google:
+  client-id: 839069606081-nv1fh799s3ope6aa4pchq3m8j940u8o1.apps.googleusercontent.com

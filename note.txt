@@ -247,3 +247,12 @@ The usage is almost identical because of **Spring Data**, but there are key diff
 "你遇到过什么部署问题？"
 
 "遇到过三个：第一，Mac 本地是 ARM 架构，EC2 是 x86，直接 build 的镜像在 EC2 跑不起来，要用 docker buildx --platform linux/amd64 指定平台。第二，React SPA 部署到 nginx 需要配置 try_files 把所有路由指向 index.html，不然刷新页面会 404。第三，CORS 配置要把前端域名加进白名单，否则浏览器会拦截请求。"
+
+
+"你有没有用过 CI/CD？"
+
+"有，我用 GitHub Actions 给 SprintDesk 设置了完整的 CI/CD 流水线。每次 push 到 main 分支会自动触发：先跑单元测试，通过后用 Docker buildx 打包成 linux/amd64 镜像推到 Docker Hub，最后 SSH 进 EC2 拉新镜像重启容器。整个流程不需要手动操作，改完代码 push 就自动上线。"
+
+"你遇到过什么 CI/CD 问题？"
+
+"遇到过两个：第一，本地 Mac 是 ARM 架构，EC2 是 x86，需要用 docker buildx --platform linux/amd64 指定平台才能跑。第二，GitHub Actions 的 runner IP 不固定，EC2 安全组的 SSH 规则要改成 Anywhere 才能让 Actions 连进去。"

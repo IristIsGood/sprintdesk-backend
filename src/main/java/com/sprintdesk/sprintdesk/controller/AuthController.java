@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.sprintdesk.sprintdesk.dto.request.GoogleAuthRequest;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -37,5 +38,10 @@ public class AuthController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
     return ResponseEntity.ok("SprintDesk is running on AWS with CI/CD!");
+}
+
+@PostMapping("/google")
+public ResponseEntity<AuthResponse> googleLogin(@RequestBody GoogleAuthRequest request) {
+    return ResponseEntity.ok(authService.googleLogin(request.getCredential()));
 }
 }
